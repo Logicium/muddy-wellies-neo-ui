@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# raw downloads from the old site — regenerate with `npm run photos`
+scripts/raw/

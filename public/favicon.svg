@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="6" fill="#12100d"/>
+  <!-- a wellie boot, reduced to its gesture -->
+  <path d="M11 6h6v10c0 1 .6 1.8 1.6 2.2l4.6 1.8c1.1.45 1.8 1.5 1.8 2.7 0 1.8-1.5 3.3-3.3 3.3H9.5C8.1 26 7 24.9 7 23.5V22c0-1 .7-1.9 1.7-2.2 1.4-.4 2.3-1.6 2.3-3V6z" fill="#e9e2d4"/>
+  <path d="M11 6h6v3h-6z" fill="#c68f3f"/>
+</svg>
