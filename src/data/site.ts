@@ -166,10 +166,16 @@ export const content = reactive({
   },
 
   about: {
-    heading: 'Howdy, I’m Ashley.',
+    // the feature title, set into the hero image; the full introduction
+    // lives in the first paragraph
+    heading: 'Howdy.',
     portraitId: '072-img-7284',
+    portraitChip: 'The one behind the camera',
+    /** the full-bleed frame the title is set into */
+    heroId: '066-dsc-4819-1',
+    pullQuote: 'Nothing like a jump in a muddy puddle to fill the soul.',
     paragraphs: [
-      'I’m a photographer in rural Southern Colorado. I wish I could say I have a niche, but at the end of the day I just like taking photographs of what inspires me, to retell a story.',
+      'My name is Ashley and I am a photographer in rural Southern Colorado. I wish I could say I have a niche, but at the end of the day I just like taking photographs of what inspires me, to retell a story.',
       'Muddy Wellies comes from my Scottish background. Being born in the Highlands gave me the roots of my wellies. Nothing like a jump in a muddy puddle to fill the soul.',
       'I’m a nurse by trade, and I know specializing is supposed to matter. I don’t have one and I’m proud of it. It doesn’t mean I won’t research, learn, study, and ask questions about your project. I just wanna shoot, so let’s go.',
       'What I love to capture is a documentary style shoot that’s full of movement. I love meeting folks and making their ideas come to fruition.',

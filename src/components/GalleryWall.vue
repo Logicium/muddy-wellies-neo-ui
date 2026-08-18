@@ -22,8 +22,14 @@ const props = withDefaults(
     density?: 'default' | 'hero'
     /** cap column count (hero uses more) */
     maxCols?: number
+    /**
+     * 'wheel' mounts the archive on the drum; 'flat' forces the plain grid.
+     * Short supporting strips (the About outtakes) ask for flat explicitly —
+     * a two-row drum reads as a bug, not a effect.
+     */
+    surface?: 'wheel' | 'flat'
   }>(),
-  { density: 'default', maxCols: 4 },
+  { density: 'default', maxCols: 4, surface: 'wheel' },
 )
 
 const { openLightbox } = useLightbox()
@@ -71,9 +77,11 @@ const PERSP = 1100 // must match .wheel-stage's perspective
 // so the curved arc is seen whole instead of swelling past the viewport.
 const Z_PUSH = 115
 const GAP = 10
-// target height of one remapped slice: smaller bends the picture more
-// faithfully, at the cost of more (static) elements
-const SLICE = 120
+// Target height of one remapped slice: smaller bends the picture more
+// faithfully, at the cost of more (static) elements. Phones get taller
+// slices — a narrow column curves far less across one photo, and every
+// slice is its own composited layer in the preserve-3d subtree.
+const sliceH = computed(() => (stageW.value < 700 ? 220 : 120))
 // slices overlap so neither sub-pixel rounding nor the antialiased edge of a
 // rotated plane can show a hairline where two slices of one photo meet
 const OVERLAP = 3
@@ -107,7 +115,7 @@ const layout = computed<{ slices: Slice[]; totalH: number }>(() => {
     for (const cell of col) {
       const h = colW / cell.photo.ar
       const y = ys[c] ?? 0
-      const parts = Math.min(7, Math.max(1, Math.round(h / SLICE)))
+      const parts = Math.min(7, Math.max(1, Math.round(h / sliceH.value)))
       const sh = h / parts
 
       for (let k = 0; k < parts; k++) {
@@ -218,17 +226,20 @@ const onResize = () => {
 }
 
 onMounted(async () => {
-  const fine =
-    window.matchMedia('(pointer: fine)').matches &&
+  // The drum runs on every device — touch included. The only opt-outs are an
+  // explicit `flat` surface and a reduced-motion request, which is an
+  // accessibility preference rather than a device capability.
+  const ok =
+    props.surface === 'wheel' &&
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  drumOn.value = fine
-  if (!fine) return
+  drumOn.value = ok
+  if (!ok) return
   // the stage only exists after the v-if renders — measuring before that
   // leaves the whole wall laid out at the placeholder width
   await nextTick()
   measure()
-  // walls shorter than a viewport don't earn a drum
-  if (layout.value.totalH < viewH.value * 0.9) {
+  // a wall too short to fill the stage would hang in empty space
+  if (layout.value.totalH < viewH.value * 0.6) {
     drumOn.value = false
     return
   }
@@ -284,11 +295,68 @@ function openFrom(index: number, el: HTMLElement) {
   )
 }
 
-// one delegated listener for the whole drum, whatever slice was hit
-function onDrumClick(e: MouseEvent) {
-  const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('.wheel-slice')
-  if (!el?.dataset.index) return
-  openFrom(Number(el.dataset.index), el)
+/**
+ * The browser will not hit-test the drum for us.
+ *
+ * The drum's own box sits at `translateZ(R - Z_PUSH)` — further from the
+ * viewer than the stage's `perspective`, i.e. past the camera plane — so
+ * Chrome refuses to route pointer events through the subtree even though
+ * every slice paints correctly and reports an accurate rect. (A synthetic
+ * `.click()` on a slice still works, which is what made this look fine in
+ * earlier testing.) Flattening the drum's transform into each slice would
+ * fix hit-testing but cost the one-style-write-per-frame design, so instead
+ * we resolve the hit ourselves — once per click, never per frame.
+ */
+function hitSliceAt(cx: number, cy: number) {
+  const drum = drumEl.value
+  const stage = stageEl.value
+  if (!drum || !stage) return null
+  const persp = parseFloat(getComputedStyle(stage).perspective) || 1100
+  const slices = layout.value.slices
+  let best: { z: number; index: number; el: HTMLElement } | null = null
+
+  for (const el of Array.from(drum.children) as HTMLElement[]) {
+    const s = slices[Number(el.dataset.i)]
+    if (!s) continue
+    // a frame turned edge-on or away carries no target, but still measures
+    const facing = Math.cos(s.phi - theta)
+    if (facing <= 0.05) continue
+
+    // Distance from the page plane. Riding the inside of the drum, frames
+    // far from the tangent curl toward the viewer, and as one approaches
+    // the camera plane its projection grows without bound — such a frame
+    // is invisible but reports a rect covering the whole screen, so it
+    // would swallow every click. Anything near that plane is not a target.
+    const z = R - Z_PUSH - s.z * facing
+    if (z > persp * 0.7) continue
+
+    const r = el.getBoundingClientRect()
+    if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) continue
+    // among genuine overlaps the nearer frame is the one painted on top
+    if (!best || z > best.z) best = { z, index: s.index, el }
+  }
+  return best
+}
+
+let downX = 0
+let downY = 0
+
+function onStagePointerDown(e: PointerEvent) {
+  downX = e.clientX
+  downY = e.clientY
+}
+
+function onStageClick(e: MouseEvent) {
+  // keyboard activation fires straight on the slice's button element
+  const direct = (e.target as HTMLElement | null)?.closest<HTMLElement>('.wheel-slice')
+  if (direct?.dataset.index) {
+    openFrom(Number(direct.dataset.index), direct)
+    return
+  }
+  // a flick-scroll on touch must not read as a tap
+  if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 8) return
+  const hit = hitSliceAt(e.clientX, e.clientY)
+  if (hit) openFrom(hit.index, hit.el)
 }
 
 function onFlatClick(index: number, e: Event) {
@@ -299,21 +367,23 @@ function onFlatClick(index: number, e: Event) {
 <template>
   <!-- the wheel: sticky stage, one rotating drum, static remapped slices -->
   <div v-if="drumOn" ref="wrapEl" class="wheel-wrap" :style="{ height: `${wrapH}px` }">
-    <div ref="stageEl" class="wheel-stage" :style="{ perspectiveOrigin: `50% ${tangentY}px` }">
+    <div
+      ref="stageEl"
+      class="wheel-stage"
+      :style="{ perspectiveOrigin: `50% ${tangentY}px` }"
+      @pointerdown="onStagePointerDown"
+      @click="onStageClick"
+    >
       <!-- the drum must pivot about the tangent line, same as the slices and
            the projection origin — three anchors, one height -->
-      <div
-        ref="drumEl"
-        class="wheel-drum"
-        :style="{ transformOrigin: `50% ${tangentY}px` }"
-        @click="onDrumClick"
-      >
+      <div ref="drumEl" class="wheel-drum" :style="{ transformOrigin: `50% ${tangentY}px` }">
         <component
           :is="s.first ? 'button' : 'div'"
-          v-for="s in layout.slices"
+          v-for="(s, k) in layout.slices"
           :key="s.key"
           class="wheel-slice"
           :data-index="s.index"
+          :data-i="k"
           :aria-label="s.first ? s.photo.alt : undefined"
           :aria-hidden="s.first ? undefined : 'true'"
           :style="sliceStyle(s)"
@@ -381,8 +451,15 @@ function onFlatClick(index: number, e: Event) {
   position: sticky;
   top: var(--header-h);
   height: calc(100vh - var(--header-h));
+  /* dvh keeps the stage honest while mobile browser chrome slides away */
+  height: calc(100dvh - var(--header-h));
   overflow: hidden;
-  perspective: 1100px;
+  /* the vanishing point tracks viewport width, so a phone reads the same
+     amount of curve as a desktop rather than a nearly flat wall */
+  perspective: clamp(680px, 78vw, 1100px);
+  /* the affordance lives here because the stage, not the slice, is what
+     actually receives the pointer (see hitSliceAt) */
+  cursor: zoom-in;
 }
 
 .wheel-drum {
@@ -399,7 +476,6 @@ function onFlatClick(index: number, e: Event) {
   border: none;
   background: none;
   overflow: hidden;
-  cursor: zoom-in;
   backface-visibility: hidden;
 }
 

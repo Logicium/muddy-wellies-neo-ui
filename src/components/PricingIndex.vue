@@ -233,7 +233,8 @@ const dollars = (n: number) => `$${n.toLocaleString()}`
    already hides horizontal overflow, so 100vw is safe here. The ratio is
    fixed per tier, which is what keeps the height stable while paging. */
 .band {
-  --plate-gap: clamp(4px, 0.55vw, 10px);
+  /* frames butt edge to edge — one continuous surface, no gutters */
+  --plate-gap: 0px;
   position: relative;
   width: 100vw;
   margin-left: calc(50% - 50vw);
@@ -277,9 +278,11 @@ const dollars = (n: number) => `$${n.toLocaleString()}`
 /* ---------- the inset detail ---------- */
 
 .detail-plate {
+  /* dead centre of the band, both axes: inset 0 + auto margins, so the
+     paging transition's transform stays free for the slide animation */
   position: absolute;
-  left: 6%;
-  bottom: 8%;
+  inset: 0;
+  margin: auto;
   z-index: 3;
   width: clamp(96px, 13%, 260px);
   aspect-ratio: var(--ar);
@@ -525,7 +528,7 @@ const dollars = (n: number) => `$${n.toLocaleString()}`
 
 @media (max-width: 720px) {
   .band-foot { flex-direction: column; gap: 0.8rem; }
-  .detail-plate { left: 5%; bottom: 6%; width: 22%; }
+  .detail-plate { width: 22%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
