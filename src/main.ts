@@ -6,6 +6,9 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { initTheme } from './composables/useTheme'
+import { initApotomeAnalytics } from './kit/analytics'
+import { applyDeep, initApotomeEditor, loadPublishedContent } from './kit/editor'
+import { content } from './data/site'
 
 /**
  * v-reveal — fades/slides an element in the first time it enters the viewport.
@@ -44,3 +47,26 @@ app.use(router)
 app.directive('reveal', reveal)
 
 app.mount('#app')
+
+/* ----------------------------------------------------------------------
+ * Apotome Labs: analytics and the in-situ content editor.
+ *
+ * Both are opt-in on environment. With the variables unset this file does
+ * nothing at all, so the site builds and runs standalone exactly as before.
+ *
+ * The published overlay is merged onto the content tree before the editor
+ * starts, so the editor edits what visitors are actually seeing rather than
+ * the defaults compiled into the bundle. Mounting happens first either way:
+ * a slow or unreachable studio API must never delay the site rendering.
+ * ---------------------------------------------------------------------- */
+const apiUrl = import.meta.env.VITE_API_URL as string | undefined
+const siteKey = import.meta.env.VITE_APOTOME_SITE_KEY as string | undefined
+
+if (apiUrl && siteKey) {
+  initApotomeAnalytics({ siteKey, apiUrl, router })
+
+  void loadPublishedContent({ siteKey, apiUrl }).then((overlay) => {
+    if (overlay) applyDeep(content, overlay)
+    initApotomeEditor({ siteKey, apiUrl, config: content })
+  })
+}
