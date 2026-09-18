@@ -10,6 +10,8 @@ const router = createRouter({
     { path: '/journal/:slug', name: 'journal-post', component: () => import('../pages/BlogPostPage.vue') },
     { path: '/about', name: 'about', component: () => import('../pages/AboutPage.vue') },
     { path: '/contact', name: 'contact', component: () => import('../pages/ContactPage.vue') },
+    /* a client's own account: galleries, invoices, details; the Apotome kit portal, in our colours */
+    { path: '/account', name: 'account', component: () => import('../pages/AccountPage.vue') },
     // earlier brand-voice paths, kept as redirects
     { path: '/the-muck', redirect: '/work' },
     { path: '/the-gritty-details', redirect: '/rates' },
