@@ -15,10 +15,13 @@ import type { PortalContext, PortalCustomer, PortalOverview, PortalSection } fro
 import PortalSignIn from './PortalSignIn.vue'
 import PortalDocuments from './PortalDocuments.vue'
 import PortalProfile from './PortalProfile.vue'
+import PortalGalleries from './PortalGalleries.vue'
+import { createApotomeGalleries } from '../galleries'
 
 const props = withDefaults(defineProps<ApotomePortalOptions & { initialTab?: string }>(), { portal: 'site' })
 
 const portal = createApotomePortal({ siteKey: props.siteKey, apiUrl: props.apiUrl, portal: props.portal })
+const galleries = createApotomeGalleries({ siteKey: props.siteKey, apiUrl: props.apiUrl, portal: props.portal })
 
 const root = ref<HTMLElement | null>(null)
 const context = ref<PortalContext | null>(null)
@@ -26,7 +29,12 @@ const overview = ref<PortalOverview | null>(null)
 const signedIn = ref(portal.signedIn())
 const loading = ref(true)
 const error = ref('')
-const tab = ref<string>(props.initialTab ?? '')
+const tab = ref<string>(
+  props.initialTab ??
+    (typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tab') ?? (new URLSearchParams(window.location.search).get('gallery') ? 'galleries' : '')
+      : ''),
+)
 
 const LABEL: Record<PortalSection | 'profile', string> = {
   galleries: 'Galleries',
@@ -132,8 +140,8 @@ const business = computed(() => context.value?.business ?? null)
       <p v-if="error" class="ap-error" role="alert">{{ error }}</p>
 
       <section v-if="tab === 'galleries'" class="ap-section">
-        <slot name="galleries" :overview="overview" :portal="portal">
-          <p class="ap-quiet">Your galleries will appear here once they are shared with you.</p>
+        <slot name="galleries" :overview="overview" :portal="portal" :galleries="galleries">
+          <PortalGalleries :galleries="galleries" :initial="overview.galleries" />
         </slot>
       </section>
 

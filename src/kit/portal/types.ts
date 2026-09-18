@@ -98,5 +98,98 @@ export interface PortalOverview {
   quotes?: PortalDoc[]
   invoices?: PortalDoc[]
   agreements?: PortalDoc[]
-  galleries?: unknown[]
+  galleries?: GallerySummary[]
+}
+
+/* ------------------------------ galleries ------------------------------ */
+
+export type GalleryDownloadPolicy = 'none' | 'web' | 'original'
+
+export interface GallerySummary {
+  id: number
+  slug: string
+  title: string
+  status: 'draft' | 'shared' | 'archived'
+  coverUrl: string | null
+  imageCount: number
+  bytesTotal: number
+  shootDate: string | null
+  sharedAt: string | null
+  expiresAt: string | null
+  downloadPolicy: GalleryDownloadPolicy
+  downloadScope: 'all' | 'selected'
+  previewsPrivate: boolean
+  selectionLimit: number | null
+  createdAt: string
+}
+
+export interface GalleryImage {
+  id: number
+  filename: string
+  previewUrl: string
+  width: number | null
+  height: number | null
+  bytes: number
+  sortOrder: number
+  /** present only when this customer may download this image */
+  downloadUrl?: string
+}
+
+export interface GalleryPriceItem {
+  sku: string
+  label: string
+  kind: 'print' | 'digital' | 'package' | 'extra'
+  priceCents: number
+  sizeLabel?: string
+  description?: string
+  perImage: boolean
+  active: boolean
+}
+
+export interface GallerySelect {
+  imageId: number
+  kind: 'favourite' | 'select'
+  note: string | null
+}
+
+export interface GalleryView extends GallerySummary {
+  message: string | null
+  images: GalleryImage[]
+  selects: GallerySelect[]
+  /** the limit as it applies to this customer, paid extras included; null means none */
+  effectiveLimit: number | null
+  extraImageCents: number | null
+  priceList: GalleryPriceItem[]
+  currency: string
+  canDownload: boolean
+}
+
+export interface GalleryCheckoutInput {
+  lines: { sku: string; imageId?: number; quantity: number }[]
+  shippingAddress?: Record<string, string>
+}
+
+export interface GalleryOrderLine {
+  kind: 'print' | 'digital' | 'package' | 'extra'
+  sku: string
+  label: string
+  imageId?: number
+  quantity: number
+  unitCents: number
+}
+
+export interface GalleryOrderView {
+  id: number
+  galleryId: number
+  galleryTitle: string
+  status: string
+  lines: GalleryOrderLine[]
+  subtotalCents: number
+  shippingCents: number
+  taxCents: number
+  totalCents: number
+  currency: string
+  paidAt: string | null
+  fulfilledAt: string | null
+  createdAt: string
 }

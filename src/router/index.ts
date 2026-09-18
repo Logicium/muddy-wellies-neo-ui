@@ -12,6 +12,8 @@ const router = createRouter({
     { path: '/contact', name: 'contact', component: () => import('../pages/ContactPage.vue') },
     /* a client's own account: galleries, invoices, details; the Apotome kit portal, in our colours */
     { path: '/account', name: 'account', component: () => import('../pages/AccountPage.vue') },
+    // a shared gallery's deep link; the portal reads the query and opens it
+    { path: '/account/gallery/:id', redirect: (to) => ({ path: '/account', query: { tab: 'galleries', gallery: String(to.params.id) } }) },
     // earlier brand-voice paths, kept as redirects
     { path: '/the-muck', redirect: '/work' },
     { path: '/the-gritty-details', redirect: '/rates' },

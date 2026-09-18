@@ -6,7 +6,7 @@
  * agreements to sign, orders, bookings, tickets, and their own details.
  *
  * Vendor the whole `portal/` folder into a client site's `src/kit/`, along
- * with `env.ts`, `client.ts` and `shop/account.ts`, and mount it one of two
+ * with `env.ts`, `client.ts`, `shop/account.ts` and `galleries.ts`, and mount it one of two
  * ways:
  *
  *   // a site with a router: point a route at the component
@@ -32,6 +32,10 @@ import type { ApotomePortalOptions } from './portal'
 export { default as CustomerPortal } from './CustomerPortal.vue'
 export { createApotomePortal } from './portal'
 export type { ApotomePortal, ApotomePortalOptions } from './portal'
+export { createApotomeGalleries } from '../galleries'
+export type { ApotomeGalleries } from '../galleries'
+export { default as PortalGalleries } from './PortalGalleries.vue'
+export { default as PortalGallery } from './PortalGallery.vue'
 export { applyPortalTheme } from './theme'
 export type * from './types'
 
