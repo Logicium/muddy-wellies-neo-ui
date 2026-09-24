@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Photo } from '@/data/photos'
-import { useLightbox } from '@/composables/useLightbox'
+import { useLightbox, type OriginRect } from '@/composables/useLightbox'
 import { categoryLabels } from '@/data/photos'
 
 // The wheel wall. The masonry is mounted on the inside of a huge drum whose
@@ -32,7 +32,7 @@ const props = withDefaults(
   { density: 'default', maxCols: 4, surface: 'wheel' },
 )
 
-const { openLightbox } = useLightbox()
+const { openLightbox, state: lightbox } = useLightbox()
 
 // ---- shared masonry packing -------------------------------------------------
 
@@ -207,6 +207,11 @@ function frame() {
   raf = 0
   const drum = drumEl.value
   if (!drum) return
+  // Hold position while a photograph is open. Locking the page removes the
+  // scrollport, which un-sticks the stage and makes `thetaTarget` read as if
+  // we were back at the top of the archive — following it would rewind the
+  // whole wall behind the viewer.
+  if (lightbox.open) return
   const t = thetaTarget()
   theta += (t - theta) * 0.14
   if (Math.abs(t - theta) > 0.00015) raf = requestAnimationFrame(frame)
@@ -217,8 +222,16 @@ function frame() {
 }
 
 function wake() {
-  if (!raf && drumOn.value) raf = requestAnimationFrame(frame)
+  if (!raf && drumOn.value && !lightbox.open) raf = requestAnimationFrame(frame)
 }
+
+// the page has its scrollport back, so the stage re-sticks: pick up from there
+watch(
+  () => lightbox.open,
+  (open) => {
+    if (!open) requestAnimationFrame(wake)
+  },
+)
 
 const onResize = () => {
   measure()
@@ -282,17 +295,24 @@ function imgStyle(s: Slice) {
   return { top: `${s.imgTop.toFixed(2)}px`, height: `${s.imgH.toFixed(1)}px` }
 }
 
-function openFrom(index: number, el: HTMLElement) {
+function openFrom(index: number, origin: HTMLElement | OriginRect) {
   openLightbox(
     props.photos.map((p) => ({
       src: p.src,
       thumb: p.thumb,
+      w: p.w,
+      h: p.h,
       title: p.alt === 'Photograph by Ashley Montoya' ? undefined : p.alt,
       label: categoryLabels[p.category],
     })),
     index,
-    el,
+    origin,
   )
+}
+
+/** on the drum the picture's union rect is the honest place to grow from */
+function openWheel(index: number, fallback: HTMLElement) {
+  openFrom(index, photoRect(index) ?? fallback)
 }
 
 /**
@@ -307,35 +327,73 @@ function openFrom(index: number, el: HTMLElement) {
  * fix hit-testing but cost the one-style-write-per-frame design, so instead
  * we resolve the hit ourselves — once per click, never per frame.
  */
+/**
+ * Distance of a frame from the page plane, or null when it is no kind of
+ * target: turned edge-on or away, or close enough to the camera plane that
+ * its projection grows without bound. Such a frame is invisible yet reports
+ * a rect covering the whole screen, so it would otherwise swallow every
+ * click and wreck any rect measured from it.
+ */
+function frameDepth(s: Slice, persp: number): number | null {
+  const facing = Math.cos(s.phi - theta)
+  if (facing <= 0.05) return null
+  const z = R - Z_PUSH - s.z * facing
+  return z > persp * 0.7 ? null : z
+}
+
+function perspective() {
+  const stage = stageEl.value
+  return stage ? parseFloat(getComputedStyle(stage).perspective) || 1100 : 1100
+}
+
 function hitSliceAt(cx: number, cy: number) {
   const drum = drumEl.value
-  const stage = stageEl.value
-  if (!drum || !stage) return null
-  const persp = parseFloat(getComputedStyle(stage).perspective) || 1100
+  if (!drum) return null
+  const persp = perspective()
   const slices = layout.value.slices
   let best: { z: number; index: number; el: HTMLElement } | null = null
 
   for (const el of Array.from(drum.children) as HTMLElement[]) {
     const s = slices[Number(el.dataset.i)]
     if (!s) continue
-    // a frame turned edge-on or away carries no target, but still measures
-    const facing = Math.cos(s.phi - theta)
-    if (facing <= 0.05) continue
-
-    // Distance from the page plane. Riding the inside of the drum, frames
-    // far from the tangent curl toward the viewer, and as one approaches
-    // the camera plane its projection grows without bound — such a frame
-    // is invisible but reports a rect covering the whole screen, so it
-    // would swallow every click. Anything near that plane is not a target.
-    const z = R - Z_PUSH - s.z * facing
-    if (z > persp * 0.7) continue
-
+    const z = frameDepth(s, persp)
+    if (z === null) continue
     const r = el.getBoundingClientRect()
     if (cx < r.left || cx > r.right || cy < r.top || cy > r.bottom) continue
     // among genuine overlaps the nearer frame is the one painted on top
     if (!best || z > best.z) best = { z, index: s.index, el }
   }
   return best
+}
+
+/**
+ * Where a photograph actually sits on screen. Each one is remapped across
+ * several slices, so the viewer has to grow from their union — handed a
+ * single slice it expands out of a sliver a fifth of the picture's height,
+ * which is what made the opening lurch and the closing shrink overshoot.
+ */
+function photoRect(index: number): OriginRect | null {
+  const drum = drumEl.value
+  if (!drum) return null
+  const persp = perspective()
+  const slices = layout.value.slices
+  let left = Infinity
+  let top = Infinity
+  let right = -Infinity
+  let bottom = -Infinity
+
+  for (const el of Array.from(drum.children) as HTMLElement[]) {
+    const s = slices[Number(el.dataset.i)]
+    if (!s || s.index !== index) continue
+    if (frameDepth(s, persp) === null) continue
+    const r = el.getBoundingClientRect()
+    left = Math.min(left, r.left)
+    top = Math.min(top, r.top)
+    right = Math.max(right, r.right)
+    bottom = Math.max(bottom, r.bottom)
+  }
+  if (!Number.isFinite(left)) return null
+  return { left, top, width: right - left, height: bottom - top }
 }
 
 let downX = 0
@@ -350,13 +408,13 @@ function onStageClick(e: MouseEvent) {
   // keyboard activation fires straight on the slice's button element
   const direct = (e.target as HTMLElement | null)?.closest<HTMLElement>('.wheel-slice')
   if (direct?.dataset.index) {
-    openFrom(Number(direct.dataset.index), direct)
+    openWheel(Number(direct.dataset.index), direct)
     return
   }
   // a flick-scroll on touch must not read as a tap
   if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 8) return
   const hit = hitSliceAt(e.clientX, e.clientY)
-  if (hit) openFrom(hit.index, hit.el)
+  if (hit) openWheel(hit.index, hit.el)
 }
 
 function onFlatClick(index: number, e: Event) {

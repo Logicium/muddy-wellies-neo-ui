@@ -63,6 +63,8 @@ function openFrame(tier: PricingTier, index: number, e: Event) {
     list.map((p) => ({
       src: p.src,
       thumb: p.thumb,
+      w: p.w,
+      h: p.h,
       title: p.alt,
       label: categoryLabels[p.category],
     })),

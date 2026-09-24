@@ -12,17 +12,64 @@ const { state, closeLightbox, step } = useLightbox()
 const mounted = ref(false) // controls the overlay's presence in the DOM
 const active = ref(false) // drives the backdrop + chrome fade
 const imgEl = ref<HTMLImageElement | null>(null)
+const stageEl = ref<HTMLElement | null>(null)
 
 const current = computed(() => state.images[state.index])
 
 // thumb-first: displaySrc starts at the thumb (if any) and upgrades to the
 // full asset in the background. Keyed by index so paging resets it.
 const fullLoaded = ref(false)
+/** true while the open animation is playing */
+const growing = ref(false)
+
 const displaySrc = computed(() => {
   const c = current.value
   if (!c) return ''
-  return fullLoaded.value || !c.thumb ? c.src : c.thumb
+  // never swap the file mid-flight: decoding a 1600px asset during the
+  // transform is exactly what made the growth stutter
+  if (!c.thumb) return c.src
+  return fullLoaded.value && !growing.value ? c.src : c.thumb
 })
+
+/**
+ * The frame is sized from the photograph's own ratio rather than from
+ * whichever file happens to be loaded. Without this the box is the thumb's
+ * intrinsic 400px while the thumb shows and the full asset's 1600px once it
+ * arrives, so the picture visibly jumped the moment the upgrade landed — and
+ * the closing shrink measured against the wrong box.
+ */
+const box = ref<{ w: number; h: number } | null>(null)
+
+function measureBox() {
+  const c = current.value
+  const stage = stageEl.value
+  if (!c?.w || !c?.h || !stage) {
+    box.value = null
+    return
+  }
+  const cs = getComputedStyle(stage)
+  const availW = Math.min(
+    stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+    window.innerWidth * 0.94,
+    1500,
+  )
+  const availH = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+  if (!(availW > 0) || !(availH > 0)) {
+    box.value = null
+    return
+  }
+  const s = Math.min(availW / c.w, availH / c.h)
+  box.value = { w: Math.round(c.w * s), h: Math.round(c.h * s) }
+}
+
+const boxStyle = computed(() =>
+  box.value ? { width: `${box.value.w}px`, height: `${box.value.h}px` } : undefined,
+)
+
+const onResize = () => {
+  if (state.open) measureBox()
+}
+window.addEventListener('resize', onResize)
 
 let upgrade: HTMLImageElement | null = null
 function preloadFull() {
@@ -55,8 +102,11 @@ async function growIn() {
   await nextTick()
   const img = imgEl.value
   if (!img) return
-  // wait until the image has real dimensions so the final rect is correct
-  if (!img.complete || !img.naturalWidth) {
+  measureBox()
+  // With a known ratio the final rect is decided by CSS, so the animation can
+  // start on the cached thumb instead of waiting on a download. Only fall back
+  // to waiting when dimensions were not supplied.
+  if (!box.value && (!img.complete || !img.naturalWidth)) {
     await new Promise((res) => {
       img.onload = res
       img.onerror = res
@@ -73,12 +123,25 @@ async function growIn() {
   requestAnimationFrame(() => {
     img.style.transition = GROW
     img.style.transform = 'none'
+    // the full asset may swap in only once the picture has settled
+    let done = false
+    const settle = () => {
+      if (done) return
+      done = true
+      growing.value = false
+    }
+    img.addEventListener('transitionend', settle, { once: true })
+    setTimeout(settle, 700)
   })
+}
+
+function unlockScroll() {
+  document.documentElement.style.overflow = ''
 }
 
 function finishClose() {
   mounted.value = false
-  document.documentElement.style.overflow = ''
+  unlockScroll()
 }
 
 function growOut() {
@@ -87,6 +150,13 @@ function growOut() {
     finishClose()
     return
   }
+  // Release the scroll lock before the shrink, not after. Locking the root
+  // removes the scrollport, which un-sticks any `position: sticky` section
+  // underneath — on the wheel wall that drops the whole gallery back to the
+  // top of the archive. Restoring it first lets the page settle into its real
+  // position while the backdrop is still opaque, so the picture shrinks back
+  // to where it actually belongs.
+  unlockScroll()
   const finalRect = img.getBoundingClientRect()
   active.value = false
   img.style.transition = GROW
@@ -107,6 +177,7 @@ watch(
   (open) => {
     if (open) {
       mounted.value = true
+      growing.value = true
       document.documentElement.style.overflow = 'hidden'
       preloadFull()
       growIn()
@@ -126,7 +197,10 @@ watch(
       img.style.transition = 'none'
       img.style.transform = 'none'
     }
-    if (state.open) preloadFull()
+    if (state.open) {
+      measureBox() // the next photograph may be a different shape
+      preloadFull()
+    }
   },
 )
 
@@ -137,7 +211,10 @@ function onKey(e: KeyboardEvent) {
   else if (e.key === 'ArrowLeft') step(-1)
 }
 window.addEventListener('keydown', onKey)
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('resize', onResize)
+})
 
 const counter = computed(() => {
   const n = state.images.length
@@ -161,12 +238,13 @@ const counter = computed(() => {
         </div>
       </header>
 
-      <figure class="lb-stage">
+      <figure ref="stageEl" class="lb-stage">
         <img
           ref="imgEl"
           :src="displaySrc"
           :alt="current?.title || ''"
           class="lb-image"
+          :style="boxStyle"
           @click.stop
         />
       </figure>

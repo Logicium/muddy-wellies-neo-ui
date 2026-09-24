@@ -29,7 +29,15 @@ const late = computed(() => content.about.paragraphs.slice(2))
 function openPortrait(e: Event) {
   if (!portrait.value) return
   openLightbox(
-    [{ src: portrait.value.src, thumb: portrait.value.thumb, title: portrait.value.alt }],
+    [
+      {
+        src: portrait.value.src,
+        thumb: portrait.value.thumb,
+        w: portrait.value.w,
+        h: portrait.value.h,
+        title: portrait.value.alt,
+      },
+    ],
     0,
     e.currentTarget as HTMLElement,
   )

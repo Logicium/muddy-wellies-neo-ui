@@ -261,6 +261,8 @@ function onPointerUp(e: PointerEvent) {
     props.photos.map((p) => ({
       src: p.src,
       thumb: p.thumb,
+      w: p.w,
+      h: p.h,
       label: categoryLabels[p.category],
     })),
     index,

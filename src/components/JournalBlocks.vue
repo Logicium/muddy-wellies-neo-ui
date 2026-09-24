@@ -17,7 +17,7 @@ function open(id: string, e: Event) {
     .filter((p) => !!p)
   const index = involved.findIndex((p) => p.id === id)
   openLightbox(
-    involved.map((p) => ({ src: p.src, thumb: p.thumb, title: p.alt })),
+    involved.map((p) => ({ src: p.src, thumb: p.thumb, w: p.w, h: p.h, title: p.alt })),
     Math.max(0, index),
     e.currentTarget as HTMLElement,
   )

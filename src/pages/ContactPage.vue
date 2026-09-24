@@ -20,6 +20,8 @@ function openStrip(index: number, e: Event) {
     strip.value.map((p) => ({
       src: p.src,
       thumb: p.thumb,
+      w: p.w,
+      h: p.h,
       title: p.alt,
       label: categoryLabels[p.category],
     })),

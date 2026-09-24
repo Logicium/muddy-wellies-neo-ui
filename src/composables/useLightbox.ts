@@ -4,6 +4,13 @@ export interface LightboxImage {
   src: string
   /** Small thumbnail painted instantly while the full image loads. */
   thumb?: string
+  /**
+   * The photograph's true pixel dimensions. Supplying these lets the viewer
+   * size its frame from the ratio alone, so swapping the thumb for the full
+   * asset cannot change the layout box mid-animation.
+   */
+  w?: number
+  h?: number
   /** Large display title (e.g. photo name). */
   title?: string
   /** Small mono eyebrow label (e.g. category). */
@@ -26,8 +33,18 @@ const state = reactive({
   origin: null as OriginRect | null,
 })
 
-function openLightbox(images: LightboxImage[], index: number, originEl: HTMLElement) {
-  const r = originEl.getBoundingClientRect()
+/**
+ * `origin` is where the picture appears to grow from. Usually that is the
+ * element clicked, but a photograph split across several elements (the wheel
+ * wall remaps each one into slices) must pass its own combined rect instead,
+ * or the viewer expands out of a sliver.
+ */
+function openLightbox(
+  images: LightboxImage[],
+  index: number,
+  origin: HTMLElement | OriginRect,
+) {
+  const r = origin instanceof HTMLElement ? origin.getBoundingClientRect() : origin
   state.origin = { top: r.top, left: r.left, width: r.width, height: r.height }
   state.images = images
   state.index = index
