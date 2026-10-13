@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { content } from '@/data/site'
-import { photos } from '@/data/photos'
+import { useJournal } from '@/composables/useJournal'
 
-function cover(id: string) {
-  return photos.find((p) => p.id === id)
-}
+const { entries } = useJournal()
 
 const dateFmt = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
@@ -22,19 +19,14 @@ const dateFmt = (iso: string) =>
 
     <section class="container cards">
       <router-link
-        v-for="p in content.journal"
+        v-for="p in entries"
         :key="p.slug"
         :to="`/journal/${p.slug}`"
         class="card"
         v-reveal
       >
-        <div class="card-media img-frame" v-if="cover(p.coverId)">
-          <img
-            :src="cover(p.coverId)!.src"
-            :alt="cover(p.coverId)!.alt"
-            loading="lazy"
-            decoding="async"
-          />
+        <div class="card-media img-frame" v-if="p.cover">
+          <img :src="p.cover.src" :alt="p.cover.alt" loading="lazy" decoding="async" />
         </div>
         <div class="card-copy">
           <span class="mono-label">{{ dateFmt(p.date) }}</span>

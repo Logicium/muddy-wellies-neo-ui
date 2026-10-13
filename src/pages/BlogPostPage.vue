@@ -1,13 +1,24 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { content } from '@/data/site'
-import { photos } from '@/data/photos'
+import { useJournal, type JournalEntry } from '@/composables/useJournal'
 import JournalBlocks from '@/components/JournalBlocks.vue'
 
 const route = useRoute()
-const post = computed(() => content.journal.find((p) => p.slug === route.params.slug))
-const cover = computed(() => photos.find((p) => p.id === post.value?.coverId))
+const { open } = useJournal()
+
+const post = ref<JournalEntry | null>(null)
+const resolved = ref(false)
+
+watch(
+  () => route.params.slug,
+  async (slug) => {
+    resolved.value = false
+    post.value = typeof slug === 'string' ? await open(slug) : null
+    resolved.value = true
+  },
+  { immediate: true },
+)
 
 const dateFmt = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', {
@@ -20,8 +31,8 @@ const dateFmt = (iso: string) =>
 <template>
   <main class="post">
     <template v-if="post">
-      <figure v-if="cover" class="post-cover">
-        <img :src="cover.src" :alt="cover.alt" decoding="async" />
+      <figure v-if="post.cover" class="post-cover">
+        <img :src="post.cover.src" :alt="post.cover.alt" decoding="async" />
       </figure>
 
       <header class="container post-head">
@@ -31,7 +42,9 @@ const dateFmt = (iso: string) =>
       </header>
 
       <section class="container post-body">
-        <JournalBlocks :blocks="post.blocks" />
+        <JournalBlocks v-if="post.blocks" :blocks="post.blocks" />
+        <!-- the portal editor's html; Ashley is the only author -->
+        <div v-else class="prose" v-html="post.body" />
       </section>
 
       <footer class="container post-foot">
@@ -39,7 +52,7 @@ const dateFmt = (iso: string) =>
       </footer>
     </template>
 
-    <section v-else class="section container">
+    <section v-else-if="resolved" class="section container">
       <h1 class="section-heading">That trail does not exist.</h1>
       <p class="lede">
         <router-link to="/journal" class="lost-link">Back to the journal.</router-link>
@@ -75,6 +88,31 @@ const dateFmt = (iso: string) =>
 .post-title { max-width: 20ch; }
 
 .post-body { padding-bottom: clamp(3rem, 6vw, 5rem); }
+
+/* portal-authored html, set in the same measure the block renderer uses */
+.prose {
+  max-width: 64ch;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  font-size: 1.08rem;
+  line-height: 1.75;
+}
+
+.prose :deep(p) { margin: 0; }
+.prose :deep(h2),
+.prose :deep(h3) { margin: 1.2rem 0 0; line-height: 1.2; }
+.prose :deep(figure) { margin: 0.6rem 0; }
+.prose :deep(img) { width: 100%; height: auto; display: block; }
+.prose :deep(figcaption) { margin-top: 0.6rem; color: var(--muted); font-size: 0.9rem; }
+.prose :deep(a) { text-decoration: underline; }
+.prose :deep(blockquote) {
+  margin: 0;
+  padding-left: 1.2rem;
+  border-left: 2px solid var(--accent);
+  color: var(--muted);
+}
 
 .post-foot {
   display: flex;

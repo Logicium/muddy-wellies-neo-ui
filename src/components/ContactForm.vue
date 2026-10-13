@@ -2,19 +2,25 @@
 import { onMounted, ref } from 'vue'
 import { content } from '@/data/site'
 import { useQuoteStore } from '@/stores/quote'
+import { createApotomeForm } from '@/kit/forms'
 
 // The call sheet: the inquiry form styled like a production document —
-// ruled fields, mono stamps, a session-type row. Front-end only: validates,
-// then hands off to the visitor's mail client with everything prefilled.
-// A quote built on the rates page arrives as the message body.
+// ruled fields, mono stamps, a session-type row. Validates, then sends
+// through the Apotome Labs forms add-on: the inquiry lands in Ashley's
+// portal inbox and her email, reply-to set to the person asking. A quote
+// built on the rates page arrives as the message body.
 
 const quote = useQuoteStore()
+const contact = createApotomeForm({ form: 'contact' })
 
 const name = ref('')
 const email = ref('')
 const sessionType = ref('')
 const message = ref('')
+/* the decoy field; a real visitor never sees it, so it must stay empty */
+const honeypot = ref('')
 const sent = ref(false)
+const sending = ref(false)
 const error = ref('')
 
 onMounted(() => {
@@ -25,7 +31,7 @@ onMounted(() => {
   }
 })
 
-function submit() {
+async function submit() {
   error.value = ''
   if (!name.value.trim() || !email.value.trim() || !message.value.trim()) {
     error.value = 'Name, email, and a few words are all it takes.'
@@ -35,12 +41,25 @@ function submit() {
     error.value = 'That email does not look quite right.'
     return
   }
-  const subject = sessionType.value ? `${sessionType.value} inquiry` : 'Project inquiry'
-  const body = `From: ${name.value} <${email.value}>\n\n${message.value}`
-  window.location.href = `mailto:${content.email}?subject=${encodeURIComponent(
-    subject,
-  )}&body=${encodeURIComponent(body)}`
-  sent.value = true
+  if (sending.value) return
+  sending.value = true
+  const result = await contact.submit({
+    name: name.value,
+    email: email.value,
+    sessionType: sessionType.value,
+    message: message.value,
+    [contact.honeypotField]: honeypot.value,
+  })
+  sending.value = false
+  if (result.ok) {
+    sent.value = true
+    name.value = ''
+    email.value = ''
+    sessionType.value = ''
+    message.value = ''
+  } else {
+    error.value = result.error
+  }
 }
 </script>
 
@@ -84,12 +103,24 @@ function submit() {
       />
     </label>
 
+    <!--
+      Honeypot. Positioned off-screen rather than type="hidden": a hidden
+      input is trivially skipped by a bot, a text input moved out of the
+      viewport is not. Kept out of the tab order and the a11y tree.
+    -->
+    <div class="hp" aria-hidden="true">
+      <label :for="contact.honeypotField">Do not fill this in</label>
+      <input :id="contact.honeypotField" v-model="honeypot" type="text" tabindex="-1" autocomplete="off" />
+    </div>
+
     <p v-if="error" class="sheet-error mono-label" role="alert">{{ error }}</p>
     <p v-if="sent" class="sheet-sent mono-label" role="status">
-      Your mail app should be open. If not, write {{ content.email }} directly.
+      Sent. Ashley replies within 48 hours; in a hurry, write {{ content.email }} directly.
     </p>
 
-    <button class="btn solid sheet-send" type="submit">Send it <span class="arrow">→</span></button>
+    <button class="btn solid sheet-send" type="submit" :disabled="sending">
+      {{ sending ? 'Sending' : 'Send it' }} <span class="arrow">→</span>
+    </button>
   </form>
 </template>
 
@@ -178,4 +209,13 @@ textarea:focus {
 .sheet-sent { color: var(--accent); }
 
 .sheet-send { align-self: flex-start; }
+
+/* honeypot: out of sight and out of the tab order, but a real input */
+.hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
 </style>
