@@ -1,7 +1,9 @@
 {
   "extends": "@vue/tsconfig/tsconfig.dom.json",
   "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
-  "exclude": ["src/**/__tests__/*"],
+  // The SEO module's build-time half runs under Node, not in the browser
+  // bundle; it is type-checked by tsconfig.node.json instead.
+  "exclude": ["src/**/__tests__/*", "src/seo/node.ts", "src/seo/prerender.ts", "src/seo/browser.ts", "src/seo/expand.ts", "src/seo/vercel.ts"],
   "compilerOptions": {
     // Extra safety for array and object lookups, but may have false positives.
     "noUncheckedIndexedAccess": true,

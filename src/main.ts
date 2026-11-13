@@ -8,6 +8,8 @@ import router from './router'
 import { initTheme } from './composables/useTheme'
 import { initApotomeAnalytics } from './kit/analytics'
 import { applyDeep, initApotomeEditor, loadPublishedContent } from './kit/editor'
+import { installSeo } from './seo'
+import { site as seoSite } from './seo.site'
 import { content } from './data/site'
 
 /**
@@ -44,6 +46,8 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+// the head follows the route table on every navigation; the build wrote the same tags per page
+installSeo(router, seoSite)
 app.directive('reveal', reveal)
 
 app.mount('#app')

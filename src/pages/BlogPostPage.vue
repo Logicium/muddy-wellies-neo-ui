@@ -3,11 +3,14 @@ import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useJournal, type JournalEntry } from '@/composables/useJournal'
 import JournalBlocks from '@/components/JournalBlocks.vue'
+import { useSeoData } from '@/seo'
 
 const route = useRoute()
 const { open } = useJournal()
 
 const post = ref<JournalEntry | null>(null)
+// title, description, canonical, share card and BlogPosting follow the loaded entry
+useSeoData(post)
 const resolved = ref(false)
 
 watch(
