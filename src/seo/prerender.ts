@@ -1,4 +1,4 @@
-/* vendored from apotome-seo 1.0.0; edit the source, then re-run vendor.mjs */
+/* vendored from apotome-seo 1.0.1; edit the source, then re-run vendor.mjs */
 /**
  * The postbuild step: one HTML file per public route, plus sitemap.xml,
  * robots.txt, llms.txt, 404.html and a report. Section 13.3 of the standard.
@@ -96,7 +96,7 @@ export async function prerender(opts: PrerenderOptions): Promise<PrerenderResult
     if (!p.title.trim() || VITE_TITLE.test(p.title)) errors.push(`${p.path}: empty or default title`)
     if (!p.description.trim()) errors.push(`${p.path}: empty description`)
     if (p.description === site.description && p.path !== '/') warnings.push(`${p.path}: uses the site-wide description`)
-    if (p.title.length > 70) warnings.push(`${p.path}: title is ${p.title.length} characters`)
+    if (p.title.length > 70) warnings.push(`${p.path}: title is ${p.title.length} characters even without the brand suffix`)
     const dup = titles.get(p.title)
     if (dup) errors.push(`${p.path}: duplicate title with ${dup} ("${p.title}")`)
     titles.set(p.title, p.path)

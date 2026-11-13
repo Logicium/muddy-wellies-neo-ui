@@ -1,4 +1,4 @@
-/* vendored from apotome-seo 1.0.0; edit the source, then re-run vendor.mjs */
+/* vendored from apotome-seo 1.0.1; edit the source, then re-run vendor.mjs */
 /**
  * From a route and its context to a ResolvedPage.
  *
@@ -34,8 +34,14 @@ export function pageTitle(site: SiteConfig, title: string | undefined, path: str
   if (path === '/') return title
   const template = site.titleTemplate ?? ((t: string) => `${t} · ${site.name}`)
   // a title that already names the brand is left alone
-  return title.includes(site.name) ? title : template(title)
+  if (title.includes(site.name)) return title
+  const full = template(title)
+  // past what a result shows, the suffix is what gets cut: drop it and keep the subject whole
+  return full.length > MAX_TITLE ? title : full
 }
+
+/** Characters a search result shows before it truncates a title. */
+export const MAX_TITLE = 65
 
 export function crumbsFromPath(path: string, lastName?: string): Crumb[] {
   const parts = normalizePath(path).split('/').filter(Boolean)

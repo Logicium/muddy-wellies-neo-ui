@@ -133,28 +133,53 @@ const entryBody = (e: JournalSeoEntry): string =>
     e.blocks ? blocksHtml(e.blocks) : (e.body ?? '')
   }<p>By ${esc(content.photographer)}, ${esc(content.name)}. <a href="/journal">All journal entries</a>.</p></article>`
 
+/**
+ * The entry behind a journal page. The build passes it from expand; in the
+ * browser the router has only the slug until the page loads its entry and
+ * hands it over through useSeoData, so fall back to the bundled post, and to
+ * nothing for a portal-only slug, rather than throwing in afterEach.
+ */
+const entryOf = (ctx: { data?: JournalSeoEntry; params: Record<string, string> }): JournalSeoEntry | undefined =>
+  ctx.data ?? journalEntries.find((e) => e.slug === ctx.params.slug)
+
 export const postSeo: RouteSeo<JournalSeoEntry> = {
   expand: async ({ apiUrl, fetch }) => (await loadEntries(apiUrl, fetch)).map((e) => ({ params: { slug: e.slug }, data: e })),
-  // the brand suffix adds 28 characters; keep the whole title under 70
-  title: ({ data }) => truncate(data.title, 42),
-  description: ({ data }) => truncate(data.deck, 160),
-  image: ({ data }) => (data.cover ? { url: data.cover.src, width: data.cover.w, height: data.cover.h, alt: data.cover.alt } : undefined),
+  // a title too long for the brand suffix drops the suffix (module 1.0.1)
+  title: (ctx) => entryOf(ctx)?.title ?? 'Journal',
+  description: (ctx) => truncate(entryOf(ctx)?.deck ?? '', 160),
+  image: (ctx) => {
+    const c = entryOf(ctx)?.cover
+    return c ? { url: c.src, width: c.w, height: c.h, alt: c.alt } : undefined
+  },
   type: 'article',
   // the bundled dates are ordering placeholders; only a portal entry carries a real date
-  lastmod: ({ data }) => (data.source === 'portal' ? data.date : undefined),
-  article: ({ data }) => ({ publishedTime: data.date, author: content.photographer, section: 'Journal' }),
-  breadcrumb: ({ data }) => [{ name: 'Journal', path: '/journal' }, { name: data.title }],
-  schema: ({ site, path, data }) =>
-    articleNode(site, {
-      path,
-      headline: data.title,
-      description: data.deck,
-      image: data.cover?.src,
-      datePublished: data.date,
-      author: { name: content.photographer, url: `${site.siteUrl}/about` },
-      section: 'Journal',
-    }),
-  body: ({ data }) => entryBody(data),
+  lastmod: (ctx) => {
+    const e = entryOf(ctx)
+    return e?.source === 'portal' ? e.date : undefined
+  },
+  article: (ctx) => {
+    const e = entryOf(ctx)
+    return e ? { publishedTime: e.date, author: content.photographer, section: 'Journal' } : undefined
+  },
+  breadcrumb: (ctx) => [{ name: 'Journal', path: '/journal' }, { name: entryOf(ctx)?.title ?? 'Entry' }],
+  schema: (ctx) => {
+    const e = entryOf(ctx)
+    return e
+      ? articleNode(ctx.site, {
+          path: ctx.path,
+          headline: e.title,
+          description: e.deck,
+          image: e.cover?.src,
+          datePublished: e.date,
+          author: { name: content.photographer, url: `${ctx.site.siteUrl}/about` },
+          section: 'Journal',
+        })
+      : undefined
+  },
+  body: (ctx) => {
+    const e = entryOf(ctx)
+    return e ? entryBody(e) : ''
+  },
 }
 
 /* ------------------------------ bodies ------------------------------ */
