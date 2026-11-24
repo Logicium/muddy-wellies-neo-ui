@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
-    "postbuild": "vite-node scripts/prerender.ts",
-    "photos": "node scripts/download-photos.mjs"
+    "postbuild": "vite-node scripts/prerender.ts && node scripts/quality/check.mjs",
+    "photos": "node scripts/download-photos.mjs",
+    "quality": "node scripts/quality/check.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.1",
